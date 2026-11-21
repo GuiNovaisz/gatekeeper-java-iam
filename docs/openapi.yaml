@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Gatekeeper identity and security APIs
-  version: 0.1.0-dev
+  version: 0.1.0
   description: >-
     Browser APIs use a SESSION cookie and synchronizer CSRF token on mutations.
     OAuth/OIDC protocol endpoints use discovery metadata, not this custom API contract.

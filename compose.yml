@@ -16,7 +16,7 @@ services:
     mem_limit: 384m
   gatekeeper:
     build: .
-    image: gatekeeper:0.1.0-dev
+    image: gatekeeper:0.1.0
     environment:
       SPRING_PROFILES_ACTIVE: local
       DATABASE_URL: jdbc:postgresql://postgres:5432/gatekeeper

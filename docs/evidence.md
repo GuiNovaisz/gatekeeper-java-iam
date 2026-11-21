@@ -55,9 +55,12 @@ apply to admins; approving review count is zero so solo maintenance remains poss
 GitHub secret scanning/push protection are enabled. PR #1 was integrated into `dev`
 with merge commit `083204123307560f267d2351886f708efea8bf40`; its file tree matches
 the approved feature SHA `0f5c92c0e5434796b212fff3693fecb6a5e9075d`. The feature
-branch is preserved. `main` remains at `ece60096a5b6ba1e2be38ac142473b0254418b9a`;
-version remains `0.1.0-dev`. No promotion to main, tag or Release is authorized
-by the integration mission; release preparation requires a separate audit.
+branch is preserved. At that integration audit, `main` was still at
+`ece60096a5b6ba1e2be38ac142473b0254418b9a` and version was `0.1.0-dev`.
+The subsequent release audit promotes the same IAM implementation to `0.1.0`,
+with only version/release documentation and matching Docker references changed.
+The immutable `v0.1.0` tag identifies the audited final main commit after successful CI;
+see [release notes](releases/v0.1.0.md). Stable release is not production certification.
 
 Resolved-dependency audit: `scripts/audit-dependencies.py` queried OSV for **144**
 Maven coordinates (including test transitives), returning **0 advisories** after
