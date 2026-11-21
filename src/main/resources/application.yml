@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: gatekeeper
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/gatekeeper}
+    username: ${DATABASE_USER:gatekeeper}
+    password: ${DATABASE_PASSWORD}
+  session:
+    jdbc:
+      initialize-schema: never
+    timeout: 20m
+  mvc:
+    log-request-details: false
+server:
+  port: 8080
+  forward-headers-strategy: none
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        secure: ${COOKIE_SECURE:true}
+        same-site: lax
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+gatekeeper:
+  issuer: ${ISSUER:https://localhost:8080}
+  mfa-key: ${MFA_ENCRYPTION_KEY}
+  key-store: ${SIGNING_KEYSTORE}
+  key-store-password: ${SIGNING_KEYSTORE_PASSWORD}
+  bootstrap-login: ${BOOTSTRAP_LOGIN:}
+  bootstrap-password: ${BOOTSTRAP_PASSWORD:}
+  client-secret: ${DEMO_CLIENT_SECRET}
+logging:
+  level:
+    org.springframework.security: INFO
+    org.springframework.web: INFO
