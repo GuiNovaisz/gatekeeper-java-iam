@@ -15,6 +15,7 @@ inferred from search snippets.
 | PostgreSQL JDBC | 42.7.11 | Boot BOM |
 | Flyway | 11.7.2 | Boot BOM; explicit PostgreSQL module |
 | Bouncy Castle | 1.84 | [official provider](https://www.bouncycastle.org/download/bouncy-castle-java/), Maven Central artifact resolved |
+| Commons Compress (test transitive override) | 1.28.0 | [Apache security notices](https://commons.apache.org/proper/commons-compress/security.html); replaces Testcontainers' vulnerable 1.24.0 request |
 | Testcontainers | 1.21.4 | Boot BOM; real PostgreSQL, no disabledWithoutDocker |
 | Maven Wrapper distribution | 3.9.16 | [Maven downloads](https://maven.apache.org/download.cgi); stable 3.9 line; official wrapper only-script distribution |
 | JUnit / Surefire / Failsafe | BOM / 3.5.6 / 3.5.6 | resolved by Boot parent; see dependency tree for transitive versions |
