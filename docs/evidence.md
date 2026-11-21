@@ -1,6 +1,7 @@
 # Reproducible security evidence
 
-Local verification: JDK 21.0.13.1+2, PostgreSQL 18.7 Testcontainer, Spring application
+Local verification: JDK 21.0.13.1+2, Spring Boot 4.2.0 / Security 7.2.0,
+PostgreSQL 18.7 Testcontainer, Spring application
 on an actual random HTTP port. `mvnw.cmd -B -ntp clean verify`: **19 tests**, consisting
 of 3 unit and 16 integration/security/protocol/concurrency tests; 0 failures, 0 errors,
 0 skips. No security test disables itself without Docker. See testing.md for the
@@ -52,6 +53,12 @@ dependency review. Branch protections require both security-verification and
 dependency-review, PR and resolved conversations, forbid force pushes/deletion and
 apply to admins; approving review count is zero so solo maintenance remains possible.
 GitHub secret scanning/push protection are enabled. No merge/tag/Release is authorized.
+
+Resolved-dependency audit: `scripts/audit-dependencies.py` queried OSV for **139**
+Maven coordinates (including test transitives), returning **0 advisories** after
+upgrading the framework/dependency base. There are no advisory suppressions. CI
+repeats that audit and fails closed on API error or any finding, alongside GitHub's
+PR dependency-review action with high threshold and all dependency scopes.
 
 Artifact pattern scanning complements generated-value checks; it cannot prove absence
 of every possible secret. Tests do not establish production certification, distributed

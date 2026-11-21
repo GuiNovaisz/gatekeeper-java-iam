@@ -1,7 +1,7 @@
 # Architecture
 
 Modular monolith; Java 21; Spring Boot; Spring Security and its maintained Spring
-Authorization Server 1.5 line; JDBC/PostgreSQL; Flyway. HTTP adapters delegate to
+Authorization Server integrated in Security 7.2; JDBC/PostgreSQL; Flyway. HTTP adapters delegate to
 transactional application services; domain policies have no HTTP dependency.
 
 ```mermaid

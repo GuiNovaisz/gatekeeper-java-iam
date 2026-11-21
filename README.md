@@ -15,8 +15,8 @@ com invariantes no PostgreSQL e provas adversariais reproduzíveis.
 
 ### Arquitetura e fronteiras
 
-Monólito modular Java 21 / Spring Boot 3.5.16 / Spring Security 6.5.11 / Spring
-Authorization Server 1.5.8, JDBC, PostgreSQL 18.7, Flyway, Spring Session e Actuator.
+Monólito modular Java 21 / Spring Boot 4.2.0 / Spring Security 7.2.0 com Authorization
+Server integrado, JDBC, PostgreSQL 18.7, Flyway, Spring Session e Actuator.
 Versões/fontes: [versions](docs/versions.md). Sem frontend ou infraestrutura de mensageria.
 
 ```mermaid
@@ -134,8 +134,8 @@ PostgreSQL invariants and reproducible adversarial evidence.
 
 ### Architecture and boundaries
 
-Java 21 modular monolith: Spring Boot 3.5.16, Spring Security 6.5.11, Spring
-Authorization Server 1.5.8, JDBC, PostgreSQL 18.7, Flyway, Spring Session and Actuator.
+Java 21 modular monolith: Spring Boot 4.2.0, Spring Security 7.2.0 with integrated
+Authorization Server, JDBC, PostgreSQL 18.7, Flyway, Spring Session and Actuator.
 Official sources/versions: [versions](docs/versions.md). No frontend or messaging infrastructure.
 The architecture diagram above applies to the same implementation.
 
