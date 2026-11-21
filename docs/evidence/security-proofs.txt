@@ -1,0 +1,15 @@
+G17_TOKEN_REVOCATION_PROOF standardRevocation=true resetRefresh=revoked resetLocalAccess=revoked
+G6_BRUTE_FORCE_PROOF temporaryBlock=true clockExpiry=true locked=denied disabled=denied enumeration=generic
+G1_G20_STORAGE_PROOF passwordHash=argon2id normalizedUnique=true foreignKey=enforced
+G12_G14_PKCE_REDIRECT_PROOF missingVerifier=rejected wrongVerifier=rejected plain=rejected invalidRedirect=rejected exactPort=true
+G9_G10_G17_RESET_PROOF replay=rejected concurrentAttempts=2 success=1 rejected=1 expired=rejected oldSession=revoked
+SESSION_REVOCATION_PROOF ownership=denied others=revoked logout=invalidated httpOnly=true sameSite=Lax
+G7_G8_MFA_PROOF activationRequiresProof=true passwordOnly=denied totpReplay=denied recoverySingleUse=true encryptedSeed=true
+G15_TOKEN_VALIDATION_PROOF malformed=denied expired=denied invalidSignature=denied wrongAudience=denied wrongIssuer=denied
+G18_AUDIT_PROOF persistent=true update=denied delete=denied truncate=denied secretFields=absent
+CONCURRENT_RECOVERY_PROOF attempts=2 success=1 rejected=1
+G2_G5_SESSION_AUTHZ_PROOF rotated=true csrf=denied horizontal=denied vertical=denied defaultDeny=true
+PASSWORD_ADMIN_PROOF currentPasswordRequired=true oldSessions=revoked permissionPolicy=enforced clientSecret=hashed metrics=bounded
+CODE_CONCURRENCY_PROOF expired=rejected concurrentAttempts=2 success=1 rejected=1
+G11_G13_OIDC_PROOF discovery=true publicJWKS=true authorizationCodeS256=accepted codeReplay=rejected idToken=true
+G16_REFRESH_REPLAY_PROOF rotated=true old=rejected family=revoked concurrentAttempts=2 success=1 validFamilies=0

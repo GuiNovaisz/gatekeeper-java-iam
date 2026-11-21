@@ -1,0 +1,297 @@
+openapi: 3.0.3
+info:
+  title: Gatekeeper identity and security APIs
+  version: 0.1.0-dev
+  description: >-
+    Browser APIs use a SESSION cookie and synchronizer CSRF token on mutations.
+    OAuth/OIDC protocol endpoints use discovery metadata, not this custom API contract.
+    No example contains a usable credential. MFA/recovery material is returned only once.
+servers:
+  - url: http://127.0.0.1:8080
+security:
+  - session: []
+paths:
+  /api/auth/csrf:
+    get:
+      summary: Obtain a CSRF token and establish an anonymous session
+      security: []
+      responses:
+        '200':
+          description: Retain the cookie and send headerName/token on mutations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  headerName: {type: string}
+                  token: {type: string}
+  /api/registration:
+    post:
+      summary: Request registration; valid duplicate/new requests share a 202 contract
+      security: []
+      parameters: [{$ref: '#/components/parameters/csrf'}]
+      requestBody: {$ref: '#/components/requestBodies/login'}
+      responses:
+        '202': {description: Request accepted without an account-existence disclosure}
+        '400': {$ref: '#/components/responses/rejected'}
+        '403': {$ref: '#/components/responses/forbidden'}
+        '429': {$ref: '#/components/responses/throttled'}
+  /api/auth/login:
+    post:
+      summary: Authenticate password and start MFA challenge if enrolled
+      security: []
+      parameters: [{$ref: '#/components/parameters/csrf'}]
+      requestBody: {$ref: '#/components/requestBodies/login'}
+      responses:
+        '204': {description: Authentication complete; session identifier rotated}
+        '202': {description: MFA_REQUIRED; not yet an authenticated principal}
+        '401': {$ref: '#/components/responses/unauthorized'}
+        '403': {$ref: '#/components/responses/forbidden'}
+  /api/auth/mfa:
+    post:
+      summary: Complete a pending password login with TOTP or one recovery code
+      security: []
+      parameters: [{$ref: '#/components/parameters/csrf'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: {type: string, maxLength: 128, writeOnly: true}
+                recovery: {type: boolean, default: false}
+      responses:
+        '204': {description: MFA complete; authenticated session rotated}
+        '401': {$ref: '#/components/responses/unauthorized'}
+  /api/auth/logout:
+    post:
+      summary: Revoke all sessions and OAuth authorizations of the current identity
+      parameters: [{$ref: '#/components/parameters/csrf'}]
+      responses:
+        '204': {description: Credentials revoked and browser session invalidated}
+        '401': {$ref: '#/components/responses/unauthorized'}
+        '403': {$ref: '#/components/responses/forbidden'}
+  /api/identities/{id}:
+    get:
+      summary: Read own private identity using identity:read permission and ownership
+      parameters: [{$ref: '#/components/parameters/identityId'}]
+      responses:
+        '200':
+          description: Minimal identity representation without login or credential data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: {type: string, format: uuid}
+                  state: {type: string, enum: [ACTIVE, LOCKED, DISABLED]}
+                  mfaEnabled: {type: boolean}
+        '404': {$ref: '#/components/responses/notFound'}
+  /api/password:
+    post:
+      summary: Change password after current-password proof; revoke all credentials
+      parameters: [{$ref: '#/components/parameters/csrf'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current, replacement]
+              properties:
+                current: {type: string, maxLength: 256, writeOnly: true}
+                replacement: {$ref: '#/components/schemas/newPassword'}
+      responses:
+        '204': {description: Changed; reauthentication required}
+        '400': {$ref: '#/components/responses/rejected'}
+  /api/recovery/request:
+    post:
+      summary: Request out-of-band reset without exposing account existence
+      security: []
+      parameters: [{$ref: '#/components/parameters/csrf'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [login]
+              properties:
+                login: {type: string, maxLength: 254}
+      responses:
+        '202': {description: Generic accepted response; token is never returned here}
+        '429': {$ref: '#/components/responses/throttled'}
+  /api/recovery/reset:
+    post:
+      summary: Atomically consume a reset credential and revoke sessions/tokens
+      security: []
+      parameters: [{$ref: '#/components/parameters/csrf'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: {type: string, maxLength: 128, writeOnly: true}
+                password: {$ref: '#/components/schemas/newPassword'}
+      responses:
+        '204': {description: Password reset; MFA enrollment preserved}
+        '400': {$ref: '#/components/responses/rejected'}
+        '429': {$ref: '#/components/responses/throttled'}
+  /api/mfa/enrollment:
+    post:
+      summary: Generate encrypted pending TOTP enrollment after current-password proof
+      parameters: [{$ref: '#/components/parameters/csrf'}]
+      requestBody: {$ref: '#/components/requestBodies/mfaProof'}
+      responses:
+        '200':
+          description: One-time secret and otpauth URI; enrollment not yet active
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  secret: {type: string, description: Sensitive; never log or cache}
+                  uri: {type: string, description: Sensitive provisioning URI}
+        '400': {$ref: '#/components/responses/rejected'}
+  /api/mfa/activation:
+    post:
+      summary: Prove possession and activate MFA; revoke sessions/tokens
+      parameters: [{$ref: '#/components/parameters/csrf'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: {type: string, pattern: '^[0-9]{6}$', writeOnly: true}
+      responses:
+        '200': {$ref: '#/components/responses/recoveryCodes'}
+        '400': {$ref: '#/components/responses/rejected'}
+  /api/mfa/recovery-codes:
+    post:
+      summary: Replace recovery codes using password and a fresh TOTP
+      parameters: [{$ref: '#/components/parameters/csrf'}]
+      requestBody: {$ref: '#/components/requestBodies/mfaProof'}
+      responses:
+        '200': {$ref: '#/components/responses/recoveryCodes'}
+        '400': {$ref: '#/components/responses/rejected'}
+  /api/mfa:
+    delete:
+      summary: Disable MFA with password and fresh TOTP; revoke credentials
+      parameters: [{$ref: '#/components/parameters/csrf'}]
+      requestBody: {$ref: '#/components/requestBodies/mfaProof'}
+      responses:
+        '204': {description: Disabled; sessions/tokens revoked}
+        '400': {$ref: '#/components/responses/rejected'}
+  /api/sessions:
+    get:
+      summary: List own session management handles; never bearer session IDs
+      responses:
+        '200':
+          description: Own active sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: {type: string, description: Management handle; cannot authenticate}
+                    createdAt: {type: integer, format: int64}
+                    lastAccessAt: {type: integer, format: int64}
+    delete:
+      summary: Revoke all other sessions; retain current session
+      parameters: [{$ref: '#/components/parameters/csrf'}]
+      responses:
+        '204': {description: Other sessions revoked}
+  /api/sessions/{id}:
+    delete:
+      summary: Revoke a single owned session by management handle
+      parameters:
+        - {$ref: '#/components/parameters/csrf'}
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '204': {description: Session revoked}
+        '404': {$ref: '#/components/responses/notFound'}
+  /api/admin/identities/{id}/state:
+    patch:
+      summary: Privileged identity:manage state change with credential revocation
+      parameters: [{$ref: '#/components/parameters/csrf'}, {$ref: '#/components/parameters/identityId'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [state]
+              properties:
+                state: {type: string, enum: [ACTIVE, LOCKED, DISABLED]}
+      responses:
+        '204': {description: State changed and credentials revoked}
+        '403': {$ref: '#/components/responses/forbidden'}
+  /api/audit:
+    get:
+      summary: Privileged audit:read latest 100 security events
+      responses:
+        '200': {description: Events contain timestamps, opaque actors/targets, actions, outcomes and correlations only}
+        '403': {$ref: '#/components/responses/forbidden'}
+components:
+  securitySchemes:
+    session: {type: apiKey, in: cookie, name: SESSION}
+  parameters:
+    csrf:
+      name: X-CSRF-TOKEN
+      in: header
+      required: true
+      schema: {type: string}
+      description: Synchronizer token obtained from /api/auth/csrf using the same cookie
+    identityId: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+  schemas:
+    newPassword:
+      type: string
+      minLength: 15
+      maxLength: 128
+      writeOnly: true
+      description: Unicode passphrase; reject small explicit common-password list; no silent truncation
+  requestBodies:
+    login:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [login, password]
+            properties:
+              login: {type: string, maxLength: 254}
+              password: {type: string, maxLength: 256, writeOnly: true}
+    mfaProof:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [password]
+            properties:
+              password: {type: string, maxLength: 256, writeOnly: true}
+              code: {type: string, maxLength: 6, writeOnly: true, description: Required for regenerate/disable; not needed for initial enrollment}
+  responses:
+    rejected: {description: Generic sanitized request or credential rejection}
+    unauthorized: {description: Authentication required or rejected; login failure does not disclose account existence}
+    forbidden: {description: CSRF or permission policy denied the request}
+    throttled: {description: Temporary rate window exceeded}
+    notFound: {description: Resource absent or not owned by caller}
+    recoveryCodes:
+      description: One-time recovery-code presentation; securely retain outside browser and reauthenticate after activation
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              recoveryCodes: {type: array, items: {type: string}, minItems: 10, maxItems: 10}
