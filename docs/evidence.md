@@ -54,7 +54,7 @@ dependency-review, PR and resolved conversations, forbid force pushes/deletion a
 apply to admins; approving review count is zero so solo maintenance remains possible.
 GitHub secret scanning/push protection are enabled. No merge/tag/Release is authorized.
 
-Resolved-dependency audit: `scripts/audit-dependencies.py` queried OSV for **139**
+Resolved-dependency audit: `scripts/audit-dependencies.py` queried OSV for **144**
 Maven coordinates (including test transitives), returning **0 advisories** after
 upgrading the framework/dependency base. There are no advisory suppressions. CI
 repeats that audit and fails closed on API error or any finding, alongside GitHub's
