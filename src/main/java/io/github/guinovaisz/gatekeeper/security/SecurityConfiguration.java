@@ -87,8 +87,8 @@ public class SecurityConfiguration {
                         var saved=authorizations.findByToken(jwt.getToken().getTokenValue(),OAuth2TokenType.ACCESS_TOKEN);
                         Identity identity;
                         try{identity=identities.find(UUID.fromString(jwt.getName())).orElse(null);}catch(IllegalArgumentException e){identity=null;}
-                        Number version=jwt.getToken().getClaim("cv");
-                        if(saved==null || saved.getAccessToken()==null || !saved.getAccessToken().isActive() || identity==null || !identity.state().equals("ACTIVE") || version==null || version.longValue()!=identity.credentialVersion()) {res.setStatus(401);return;}
+                        String version=jwt.getToken().getClaimAsString("cv");
+                        if(saved==null || saved.getAccessToken()==null || !saved.getAccessToken().isActive() || identity==null || !identity.state().equals("ACTIVE") || !Long.toString(identity.credentialVersion()).equals(version)) {res.setStatus(401);return;}
                     }
                     chain.doFilter(req,res);
                 }
@@ -97,6 +97,7 @@ public class SecurityConfiguration {
     }
     @Bean @Order(3) SecurityFilterChain browser(HttpSecurity http,IdentityRepository identities,AuditService audit,RevocationService revocation) throws Exception {
         http.authorizeHttpRequests(auth->auth
+            .dispatcherTypeMatchers(jakarta.servlet.DispatcherType.ERROR).permitAll()
             .requestMatchers("/api/auth/csrf","/api/auth/login","/api/auth/mfa","/api/registration","/api/recovery/request","/api/recovery/reset","/actuator/health","/actuator/health/**").permitAll()
             .requestMatchers("/api/admin/**").hasAuthority("identity:manage")
             .requestMatchers("/api/audit").hasAuthority("audit:read")
@@ -109,7 +110,7 @@ public class SecurityConfiguration {
             .sessionManagement(s->s.sessionFixation(f->f.changeSessionId()))
             .logout(logout->logout.logoutUrl("/api/auth/logout").addLogoutHandler((req,res,auth)->{
                 if(auth!=null) {UUID id=UUID.fromString(auth.getName());revocation.all(id);audit.record(id,"LOGOUT","SUCCESS",id);}
-            }).logoutSuccessHandler((req,res,auth)->res.setStatus(204)).deleteCookies("SESSION"))
+            }).logoutSuccessHandler((req,res,auth)->res.setStatus(auth==null?401:204)).deleteCookies("SESSION"))
             .addFilterAfter(new LiveIdentityFilter(identities),SecurityContextHolderFilter.class);
         headers(http);return http.build();
     }

@@ -56,6 +56,7 @@ public class AuthenticationController {
     }
     private void complete(Identity identity,HttpServletRequest request,HttpServletResponse response) {
         HttpSession session=request.getSession(); request.changeSessionId();
+        new org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository().saveToken(null,request,response);
         session.removeAttribute("pending");session.removeAttribute("pendingUntil");session.removeAttribute("pendingVersion");
         session.setAttribute("credentialVersion",identity.credentialVersion());
         User principal=new User(identity.id().toString(),"",identities.permissions(identity.id()).stream().map(SimpleGrantedAuthority::new).toList());

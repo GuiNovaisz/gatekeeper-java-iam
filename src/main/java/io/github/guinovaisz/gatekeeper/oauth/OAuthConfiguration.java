@@ -30,7 +30,7 @@ public class OAuthConfiguration {
         return context->{
             if(OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
                 Identity identity=identities.find(UUID.fromString(context.getPrincipal().getName())).orElseThrow();
-                context.getClaims().audience(List.of("gatekeeper-resource")).claim("cv",identity.credentialVersion());
+                context.getClaims().audience(new ArrayList<>(List.of("gatekeeper-resource"))).claim("cv",Long.toString(identity.credentialVersion()));
             }
         };
     }

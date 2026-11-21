@@ -16,6 +16,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.system.*;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.context.annotation.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -32,6 +34,8 @@ import io.github.guinovaisz.gatekeeper.security.Throttle;
 @ActiveProfiles("test")
 @Testcontainers
 @Import(IamSecurityIT.TimeConfiguration.class)
+@ExtendWith(OutputCaptureExtension.class)
+@org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability
 class IamSecurityIT {
     @Container static final PostgreSQLContainer<?> POSTGRES=new PostgreSQLContainer<>("postgres:18.7-alpine");
     static final String CLIENT_SECRET=Secrets.token(32);
@@ -77,11 +81,18 @@ class IamSecurityIT {
     @Autowired LocalRecoveryDelivery delivery;
     @Autowired MutableClock clock;
     @Autowired Throttle throttle;
+    @Autowired org.springframework.security.oauth2.jwt.JwtDecoder decoder;
     @Autowired com.nimbusds.jose.jwk.source.JWKSource<com.nimbusds.jose.proc.SecurityContext> signingKeys;
     private final ObjectMapper json=new ObjectMapper();
+    private final List<String> sensitive=new CopyOnWriteArrayList<>(List.of(CLIENT_SECRET,STORE_PASSWORD));
+    private void track(String value){if(value!=null && value.length()>=16)sensitive.add(value);}
+    @AfterEach void noCredentialLeakage(CapturedOutput output){
+        boolean leaked=sensitive.stream().anyMatch(value->output.getAll().contains(value));
+        assertThat(leaked).as("captured logs must not contain credential values").isFalse();
+    }
     @BeforeEach void resetLimits(){db.update("DELETE FROM security_throttle");clock.reset();}
     private record Account(UUID id,String login,String password) { @Override public String toString(){return "Account[redacted]";} }
-    private Account account(){String login="u"+UUID.randomUUID()+"@example.test";String password=Secrets.token(24);return new Account(identities.register(login,password,false),login,password);}
+    private Account account(){String login="u"+UUID.randomUUID()+"@example.test";String password=Secrets.token(24);track(password);return new Account(identities.register(login,password,false),login,password);}
     private record Reply(int status,String body,HttpHeaders headers) { @Override public String toString(){return "Reply[status="+status+"]";} }
     private class Browser {
         final CookieManager cookies=new CookieManager(null,CookiePolicy.ACCEPT_ALL);
@@ -95,7 +106,7 @@ class IamSecurityIT {
             if(bearer!=null)builder.header("Authorization","Bearer "+bearer);
             if(body!=null)builder.header("Content-Type","application/json");
             builder.method(method,body==null?HttpRequest.BodyPublishers.noBody():HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)));
-            HttpResponse<String> response=client.send(builder.build(),HttpResponse.BodyHandlers.ofString());return new Reply(response.statusCode(),response.body(),response.headers());
+            HttpResponse<String> response=client.send(builder.build(),HttpResponse.BodyHandlers.ofString());track(cookie());return new Reply(response.statusCode(),response.body(),response.headers());
         }
         Reply login(Account account) throws Exception{return mutate("POST","/api/auth/login",Map.of("login",account.login(),"password",account.password()));}
         Reply form(Map<String,String> input) throws Exception {
@@ -103,6 +114,7 @@ class IamSecurityIT {
             HttpRequest.Builder request=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/oauth2/token")).header("Content-Type","application/x-www-form-urlencoded");
             if(input.get("client_id").equals("gatekeeper-confidential")) request.header("Authorization","Basic "+Base64.getEncoder().encodeToString(("gatekeeper-confidential:"+CLIENT_SECRET).getBytes(StandardCharsets.UTF_8)));
             HttpResponse<String> response=client.send(request.POST(HttpRequest.BodyPublishers.ofString(encoded)).build(),HttpResponse.BodyHandlers.ofString());
+            if(response.statusCode()==200){JsonNode tokens=json.readTree(response.body());for(String name:List.of("access_token","refresh_token","id_token"))track(tokens.path(name).asText());}
             return new Reply(response.statusCode(),response.body(),response.headers());
         }
     }
@@ -145,9 +157,11 @@ class IamSecurityIT {
     @Test void mfaEnrollmentReplayRecoveryAndNoPasswordOnlyBypass() throws Exception {
         Account a=account();Browser browser=new Browser();assertThat(browser.login(a).status()).isEqualTo(204);
         String secret=mfa.begin(a.id(),a.password());
+        track(secret);
         assertThat(repository.find(a.id()).orElseThrow().mfaSecret()==null).isTrue();
         assertThatThrownBy(()->mfa.activate(a.id(),"bad")).isInstanceOf(IllegalArgumentException.class);
         String code=Totp.code(secret,clock.instant().getEpochSecond()/30);List<String> codes=mfa.activate(a.id(),code);
+        codes.forEach(this::track);
         assertThat(mfa.verify(a.id(),code,false)).isFalse();
         Browser pending=new Browser();assertThat(pending.login(a).status()).isEqualTo(202);
         assertThat(pending.get("/api/identities/"+a.id()).status()).isEqualTo(401);
@@ -170,6 +184,7 @@ class IamSecurityIT {
         Reply unknown=browser.mutate("POST","/api/recovery/request",Map.of("login","no-such-user@example.test"));
         assertThat(known.status()).isEqualTo(202);assertThat(known.body().equals(unknown.body())).isTrue();
         String token=delivery.take(a.id());assertThat(token!=null).isTrue();
+        track(token);
         assertThat(db.queryForObject("SELECT digest FROM password_reset WHERE identity_id=?",String.class,a.id()).equals(token)).isFalse();
         String replacement=Secrets.token(24);
         List<Boolean> results=race(()->{try{recovery.reset(token,replacement);return true;}catch(IllegalArgumentException e){return false;}});
@@ -301,9 +316,11 @@ class IamSecurityIT {
             signedToken("http://127.0.0.1:8080","wrong-audience",Instant.now().plusSeconds(300),false),
             signedToken("https://wrong-issuer.example","gatekeeper-resource",Instant.now().plusSeconds(300),false));
         for(String token:invalid) {
+            assertThatThrownBy(()->decoder.decode(token)).isInstanceOf(org.springframework.security.oauth2.jwt.JwtException.class);
             Reply response=new Browser().send("GET","/resource/me",null,false,token);assertThat(response.status()).isEqualTo(401);
             assertThat(response.body().contains("Exception") || response.body().contains("org.springframework") || response.body().contains(token)).isFalse();
         }
+        assertThat(decoder.decode(signedToken("http://127.0.0.1:8080","gatekeeper-resource",Instant.now().plusSeconds(300),false)).getAudience()).contains("gatekeeper-resource");
         System.out.println("G15_TOKEN_VALIDATION_PROOF malformed=denied expired=denied invalidSignature=denied wrongAudience=denied wrongIssuer=denied");
     }
     @Test void ownSessionRevocationLogoutAndCookieFlags() throws Exception {
@@ -318,5 +335,35 @@ class IamSecurityIT {
         Reply cookie=new Browser().get("/api/auth/csrf");String setCookie=cookie.headers().firstValue("set-cookie").orElse("");
         assertThat(setCookie.contains("HttpOnly")).isTrue();assertThat(setCookie.contains("SameSite=Lax")).isTrue();
         System.out.println("SESSION_REVOCATION_PROOF ownership=denied others=revoked logout=invalidated httpOnly=true sameSite=Lax");
+    }
+    @Test void registrationPasswordChangeAndPrivilegedOperations() throws Exception {
+        Account a=account();Browser browser=new Browser();
+        Reply duplicate=browser.mutate("POST","/api/registration",Map.of("login",a.login(),"password",Secrets.token(24)));
+        Reply fresh=browser.mutate("POST","/api/registration",Map.of("login","n"+UUID.randomUUID()+"@example.test","password",Secrets.token(24)));
+        assertThat(duplicate.status()).isEqualTo(202);assertThat(fresh.status()).isEqualTo(202);assertThat(duplicate.body().equals(fresh.body())).isTrue();
+        assertThat(browser.login(a).status()).isEqualTo(204);
+        assertThat(browser.mutate("POST","/api/password",Map.of("current",Secrets.token(24),"replacement",Secrets.token(24))).status()).isEqualTo(400);
+        String replacement=Secrets.token(24);track(replacement);
+        assertThat(browser.mutate("POST","/api/password",Map.of("current",a.password(),"replacement",replacement)).status()).isEqualTo(204);
+        assertThat(browser.get("/api/identities/"+a.id()).status()).isEqualTo(401);
+        assertThat(new Browser().login(new Account(a.id(),a.login(),replacement)).status()).isEqualTo(204);
+        String adminLogin="admin"+UUID.randomUUID()+"@example.test",adminPassword=Secrets.token(24);track(adminPassword);
+        UUID admin=identities.register(adminLogin,adminPassword,true);Browser privileged=new Browser();assertThat(privileged.login(new Account(admin,adminLogin,adminPassword)).status()).isEqualTo(204);
+        assertThat(privileged.mutate("PATCH","/api/admin/identities/"+a.id()+"/state",Map.of("state","DISABLED")).status()).isEqualTo(204);
+        assertThat(privileged.get("/api/audit").status()).isEqualTo(200);
+        Reply metrics=privileged.get("/actuator/prometheus");assertThat(metrics.status()).isEqualTo(200);
+        assertThat(metrics.body().contains("userId=") || metrics.body().contains("email=") || metrics.body().contains("sessionId=")).isFalse();
+        assertThat(encoder.matches(CLIENT_SECRET,db.queryForObject("SELECT client_secret FROM oauth2_registered_client WHERE client_id='gatekeeper-confidential'",String.class))).isTrue();
+        System.out.println("PASSWORD_ADMIN_PROOF currentPasswordRequired=true oldSessions=revoked permissionPolicy=enforced clientSecret=hashed metrics=bounded");
+    }
+    @Test void expiredCodeAndConcurrentCodeExchangeCannotIssueTwice() throws Exception {
+        Account a=account();Browser browser=new Browser();assertThat(browser.login(a).status()).isEqualTo(204);
+        String verifier=Secrets.token(48);String expired=code(authorize(browser,"gatekeeper-public",verifier,"http://127.0.0.1:9090/callback","S256"));
+        db.update("UPDATE oauth2_authorization SET authorization_code_issued_at=?,authorization_code_expires_at=? WHERE authorization_code_value=?",java.sql.Timestamp.from(Instant.now().minusSeconds(300)),java.sql.Timestamp.from(Instant.now().minusSeconds(120)),expired);
+        assertThat(exchange(browser,"gatekeeper-public",expired,verifier).status()).isEqualTo(400);
+        String authorizationCode=code(authorize(browser,"gatekeeper-public",verifier,"http://127.0.0.1:9090/callback","S256"));
+        List<Boolean> results=race(()->exchange(new Browser(),"gatekeeper-public",authorizationCode,verifier).status()==200);
+        assertThat(results.stream().filter(Boolean::booleanValue).count()).isEqualTo(1);
+        System.out.println("CODE_CONCURRENCY_PROOF expired=rejected concurrentAttempts=2 success=1 rejected=1");
     }
 }
