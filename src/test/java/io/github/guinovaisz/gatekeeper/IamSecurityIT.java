@@ -164,6 +164,8 @@ class IamSecurityIT {
         assertThat(mfa.verify(a.id(),code,false)).isFalse();
         Browser pending=new Browser();assertThat(pending.login(a).status()).isEqualTo(202);
         assertThat(pending.get("/api/identities/"+a.id()).status()).isEqualTo(401);
+        assertThat(pending.mutate("POST","/api/auth/mfa",Map.of("code","invalid","recovery",true)).status()).isEqualTo(401);
+        assertThat(db.queryForObject("SELECT count(*) FROM security_audit WHERE actor=? AND action='MFA_FAILURE'",Integer.class,a.id())).isEqualTo(1);
         assertThat(pending.mutate("POST","/api/auth/mfa",Map.of("code",codes.getFirst(),"recovery",true)).status()).isEqualTo(204);
         assertThat(mfa.verify(a.id(),codes.getFirst(),true)).isFalse();
         assertThat(pending.get("/api/identities/"+a.id()).status()).isEqualTo(200);
@@ -248,6 +250,7 @@ class IamSecurityIT {
         JsonNode body=json.readTree(valid.body());String access=body.path("access_token").asText();
         assertThat(body.has("id_token")).isTrue();assertThat(body.has("refresh_token")).isFalse();
         com.nimbusds.jwt.SignedJWT idToken=com.nimbusds.jwt.SignedJWT.parse(body.path("id_token").asText());
+        assertThat(idToken.verify(new com.nimbusds.jose.crypto.RSASSAVerifier(com.nimbusds.jose.jwk.RSAKey.parse(key.toString())))).isTrue();
         assertThat(idToken.getJWTClaimsSet().getAudience()).contains("gatekeeper-public");
         assertThat(idToken.getJWTClaimsSet().getStringClaim("nonce")).isEqualTo("test-nonce");
         com.nimbusds.jwt.SignedJWT accessJwt=com.nimbusds.jwt.SignedJWT.parse(access);

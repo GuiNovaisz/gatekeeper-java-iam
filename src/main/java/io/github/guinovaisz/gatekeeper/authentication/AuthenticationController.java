@@ -40,6 +40,7 @@ public class AuthenticationController {
             request.getSession().setAttribute("pending",identity.id().toString());
             request.getSession().setAttribute("pendingVersion",identity.credentialVersion());
             request.getSession().setAttribute("pendingUntil",clock.instant().plusSeconds(180).getEpochSecond());
+            audit.record(identity.id(),"MFA_CHALLENGE","SUCCESS",identity.id());
             return ResponseEntity.status(202).body(Map.of("status","MFA_REQUIRED"));
         }
         complete(identity,request,response);
@@ -47,12 +48,15 @@ public class AuthenticationController {
     }
     @PostMapping("/mfa") public ResponseEntity<Void> challenge(@Valid @RequestBody Challenge input,HttpServletRequest request,HttpServletResponse response) {
         HttpSession session=request.getSession(false);
-        if(session==null || session.getAttribute("pending")==null || clock.instant().getEpochSecond()> (Long)session.getAttribute("pendingUntil")) throw new BadCredentialsException("Authentication rejected");
+        if(session==null || session.getAttribute("pending")==null || clock.instant().getEpochSecond()> (Long)session.getAttribute("pendingUntil")) throw mfaDenied(null);
         UUID id=UUID.fromString((String)session.getAttribute("pending"));
-        if(!throttle.allow("mfa",id.toString(),5,Duration.ofMinutes(5)) || !throttle.allow("mfa-source",request.getRemoteAddr(),30,Duration.ofMinutes(5))) throw new BadCredentialsException("Authentication rejected");
+        if(!throttle.allow("mfa",id.toString(),5,Duration.ofMinutes(5)) || !throttle.allow("mfa-source",request.getRemoteAddr(),30,Duration.ofMinutes(5))) throw mfaDenied(id);
         Identity identity=identities.find(id).orElseThrow(()->new BadCredentialsException("Authentication rejected"));
-        if(identity.credentialVersion()!=(Long)session.getAttribute("pendingVersion") || !mfa.verify(id,input.code(),input.recovery())) throw new BadCredentialsException("Authentication rejected");
+        if(identity.credentialVersion()!=(Long)session.getAttribute("pendingVersion") || !mfa.verify(id,input.code(),input.recovery())) throw mfaDenied(id);
         complete(identity,request,response); return ResponseEntity.noContent().build();
+    }
+    private BadCredentialsException mfaDenied(UUID id) {
+        audit.record(id,"MFA_FAILURE","DENIED",id);return new BadCredentialsException("Authentication rejected");
     }
     private void complete(Identity identity,HttpServletRequest request,HttpServletResponse response) {
         HttpSession session=request.getSession(); request.changeSessionId();

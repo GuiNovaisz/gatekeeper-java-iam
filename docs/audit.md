@@ -7,7 +7,7 @@ payload fields. No passwords, credential hashes, seeds, recovery/reset credentia
 tokens, Authorization header, client secret or session ID.
 
 Events include registration; login success/failure/throttling; password change/reset;
-MFA enrollment start/activation/verification/disable; recovery use/regeneration; session
+MFA challenge/failure/enrollment start/activation/verification/disable; recovery use/regeneration; session
 revocation; all-credential revocation; account-state admin action; client seed; token
 issuance/refresh/replay/revocation; logout. Transactional success events roll back with
 failed mutations. Failed login and throttle events commit outside rejected auth work.
