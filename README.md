@@ -6,8 +6,10 @@ Identity & Access Management platform built with Java and Spring, focused on sta
 
 **v0.1.0-dev — Identity & Access Management Foundation.** Projeto de portfólio backend
 que trata identidade, credenciais e autorização como fronteiras de segurança. Não é
-uma certificação para produção. Repositório MIT; desenvolvimento na branch
-`feature/iam-foundation`, PR para `dev`, sem merge, tag ou Release nesta missão.
+uma certificação para produção. Repositório MIT; foundation integrada em `dev` pelo
+[PR #1](https://github.com/GuiNovaisz/gatekeeper-java-iam/pull/1). A feature foi preservada
+para auditoria; sem promoção para `main`, tag ou Release. A preparação de v0.1.0
+depende de uma auditoria de release separada.
 
 O problema: implementar login é apenas uma parte de IAM. Gatekeeper conecta ciclo
 de identidade, MFA, sessões, permissões, OAuth/OIDC, revogação, recuperação e auditoria
@@ -86,7 +88,7 @@ Requisitos: JDK 21 (`JAVA_HOME`), Docker/Compose, Git e PowerShell 7. Linux: she
 ```powershell
 git clone https://github.com/GuiNovaisz/gatekeeper-java-iam.git
 cd gatekeeper-java-iam
-git switch feature/iam-foundation
+git switch dev
 ./scripts/configure.ps1
 docker compose up --build --wait --wait-timeout 180
 Invoke-RestMethod http://127.0.0.1:8080/actuator/health/readiness
@@ -125,8 +127,10 @@ The complete English version follows below.
 
 **v0.1.0-dev — Identity & Access Management Foundation.** A backend portfolio project
 treating identity, credentials and authorization as security boundaries. It is not
-a production certification. MIT repository; development on `feature/iam-foundation`,
-PR targeting `dev`, with no merge, tag or Release in this mission.
+a production certification. MIT repository; foundation integrated into `dev` through
+[PR #1](https://github.com/GuiNovaisz/gatekeeper-java-iam/pull/1). The feature branch is
+preserved for auditing; no promotion to `main`, tag or Release. Preparing v0.1.0
+requires a separate release audit.
 
 The problem: login is only one part of IAM. Gatekeeper connects identity lifecycle,
 MFA, sessions, permissions, OAuth/OIDC, revocation, recovery and audit through real
@@ -184,7 +188,7 @@ shell/OpenSSL on Linux.
 ```powershell
 git clone https://github.com/GuiNovaisz/gatekeeper-java-iam.git
 cd gatekeeper-java-iam
-git switch feature/iam-foundation
+git switch dev
 ./scripts/configure.ps1
 docker compose up --build --wait --wait-timeout 180
 Invoke-RestMethod http://127.0.0.1:8080/actuator/health/readiness
