@@ -5,7 +5,7 @@ RUN mvn -B -ntp dependency:go-offline
 COPY src ./src
 RUN mvn -B -ntp -DskipTests package
 
-FROM eclipse-temurin:21-jre-alpine@sha256:5d7689f47d670aca766b9503a70bccc2d73b4eb9221ae8f714ae958313c4ce70
+FROM eclipse-temurin:24-jre-alpine@sha256:4044b6c87cb088885bcd0220f7dc7a8a4aab76577605fa471945d2e98270741f
 RUN addgroup -S -g 10001 gatekeeper && adduser -S -u 10001 -G gatekeeper gatekeeper
 WORKDIR /app
 COPY --from=build --chown=10001:10001 /build/target/gatekeeper-java-iam-0.1.0.jar app.jar
