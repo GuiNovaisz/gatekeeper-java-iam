@@ -4,7 +4,7 @@
   <parent><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-parent</artifactId><version>4.2.0</version><relativePath/></parent>
   <groupId>io.github.guinovaisz</groupId><artifactId>gatekeeper-java-iam</artifactId><version>0.1.0</version>
   <name>Gatekeeper</name><description>Identity and Access Management Foundation</description>
-  <properties><java.version>21</java.version><bouncycastle.version>1.85</bouncycastle.version></properties>
+  <properties><java.version>21</java.version><bouncycastle.version>1.87</bouncycastle.version></properties>
   <dependencyManagement><dependencies>
     <!-- Pin the audited archive parser used by Testcontainers. -->
     <dependency><groupId>org.apache.commons</groupId><artifactId>commons-compress</artifactId><version>1.28.0</version></dependency>
