@@ -6,7 +6,7 @@ Windows or POSIX shell + OpenSSL on Linux. No Maven installation required.
 ```powershell
 git clone https://github.com/GuiNovaisz/gatekeeper-java-iam.git
 cd gatekeeper-java-iam
-git switch feature/iam-foundation
+git switch dev
 # Set JAVA_HOME to your installed JDK 21 for this shell only.
 ./scripts/configure.ps1
 docker compose up --build --wait --wait-timeout 180
