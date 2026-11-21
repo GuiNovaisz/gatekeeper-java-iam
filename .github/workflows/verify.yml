@@ -26,6 +26,10 @@ jobs:
           cache: maven
       - name: Compile, unit, PostgreSQL integration, protocol and adversarial tests, package
         run: sh mvnw -B -ntp clean verify
+      - name: Audit resolved dependencies including test transitives
+        run: |
+          sh mvnw -B -ntp dependency:tree -DoutputType=json -DoutputFile=target/dependency-tree.json
+          python3 scripts/audit-dependencies.py
       - name: Generate masked ephemeral configuration
         run: sh scripts/configure.sh
       - name: Docker build and Compose clean-start
@@ -67,4 +71,5 @@ jobs:
       - uses: actions/dependency-review-action@bbc44d14a204704ccc493733616cd1e93a0321ec # v5.0.1
         with:
           fail-on-severity: high
+          fail-on-scopes: runtime, development, unknown
           retry-on-snapshot-warnings: true

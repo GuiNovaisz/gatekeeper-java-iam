@@ -59,7 +59,9 @@ public class AuthenticationController {
         new org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository().saveToken(null,request,response);
         session.removeAttribute("pending");session.removeAttribute("pendingUntil");session.removeAttribute("pendingVersion");
         session.setAttribute("credentialVersion",identity.credentialVersion());
-        User principal=new User(identity.id().toString(),"",identities.permissions(identity.id()).stream().map(SimpleGrantedAuthority::new).toList());
+        List<org.springframework.security.core.GrantedAuthority> authorities=new ArrayList<>(identities.permissions(identity.id()).stream().map(SimpleGrantedAuthority::new).toList());
+        authorities.add(org.springframework.security.core.authority.FactorGrantedAuthority.fromAuthority(org.springframework.security.core.authority.FactorGrantedAuthority.PASSWORD_AUTHORITY));
+        User principal=new User(identity.id().toString(),"",authorities);
         Authentication auth=UsernamePasswordAuthenticationToken.authenticated(principal,null,principal.getAuthorities());
         SecurityContext context=SecurityContextHolder.createEmptyContext(); context.setAuthentication(auth); SecurityContextHolder.setContext(context);
         new HttpSessionSecurityContextRepository().saveContext(context,request,response);

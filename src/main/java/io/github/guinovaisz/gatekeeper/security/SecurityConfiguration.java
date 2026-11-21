@@ -14,8 +14,8 @@ import org.springframework.security.oauth2.core.*;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.oauth2.server.authorization.*;
 import org.springframework.security.oauth2.server.authorization.authentication.*;
-import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
-import org.springframework.security.oauth2.server.authorization.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
+import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
+import org.springframework.security.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.web.*;
 import org.springframework.security.web.authentication.logout.LogoutSuccessHandler;
@@ -32,13 +32,11 @@ import io.github.guinovaisz.gatekeeper.session.RevocationService;
 public class SecurityConfiguration {
     @Bean @Order(1) SecurityFilterChain protocol(HttpSecurity http,JdbcTemplate db,OAuth2AuthorizationService authorizations,
             PlatformTransactionManager transactions,Clock clock,AuditService audit,IdentityRepository identities,Throttle throttle) throws Exception {
-        OAuth2AuthorizationServerConfigurer server=OAuth2AuthorizationServerConfigurer.authorizationServer();
+        OAuth2AuthorizationServerConfigurer server=new OAuth2AuthorizationServerConfigurer();
         http.securityMatcher(server.getEndpointsMatcher())
             .with(server,as->as.oidc(Customizer.withDefaults())
-                .authorizationEndpoint(endpoint->endpoint.authenticationProviders(providers->providers.forEach(provider->{
-                    if(provider instanceof OAuth2AuthorizationCodeRequestAuthenticationProvider request) {
-                        request.setAuthenticationValidator(OAuth2AuthorizationCodeRequestAuthenticationValidator.DEFAULT_REDIRECT_URI_VALIDATOR
-                            .andThen(OAuth2AuthorizationCodeRequestAuthenticationValidator.DEFAULT_SCOPE_VALIDATOR).andThen(context->{
+                .authorizationEndpoint(endpoint->endpoint.authorizationCodeRequestAuthenticationValidator(
+                        new OAuth2AuthorizationCodeRequestAuthenticationValidator().andThen(context->{
                                 OAuth2AuthorizationCodeRequestAuthenticationToken input=context.getAuthentication();
                                 Object method=input.getAdditionalParameters().get("code_challenge_method");
                                 Object challenge=input.getAdditionalParameters().get("code_challenge");
@@ -47,9 +45,7 @@ public class SecurityConfiguration {
                                 if(!"S256".equals(method) || !(challenge instanceof String text) || !text.matches("[A-Za-z0-9_-]{43}")) {
                                     throw new OAuth2AuthorizationCodeRequestAuthenticationException(new OAuth2Error(OAuth2ErrorCodes.INVALID_REQUEST),input);
                                 }
-                            }));
-                    }
-                })))
+                            })))
                 .tokenRevocationEndpoint(endpoint->endpoint.revocationResponseHandler((request,response,authentication)->{
                     audit.record(null,"TOKEN_REVOKED","SUCCESS",null);response.setStatus(200);
                 }))

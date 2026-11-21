@@ -35,7 +35,6 @@ import io.github.guinovaisz.gatekeeper.security.Throttle;
 @Testcontainers
 @Import(IamSecurityIT.TimeConfiguration.class)
 @ExtendWith(OutputCaptureExtension.class)
-@org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability
 class IamSecurityIT {
     @Container static final PostgreSQLContainer<?> POSTGRES=new PostgreSQLContainer<>("postgres:18.7-alpine");
     static final String CLIENT_SECRET=Secrets.token(32);
